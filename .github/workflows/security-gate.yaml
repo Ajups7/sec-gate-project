@@ -1,0 +1,35 @@
+name: Security Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sast: # Layer 1 — static analysis
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install semgrep
+      - run: semgrep --config auto --error . # --error fails the build on findings
+
+  sca: # Layer 2 — vulnerable dependencies
+    name: SCA (Grype)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/scan-action@v4
+        with:
+          path: "."
+          fail-build: true
+          severity-cutoff: high # gate policy: fail on High/Critical
+
+  secrets: # Layer 3 — hard-coded secrets
+    name: Secrets (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # full history, not just the latest diff
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
